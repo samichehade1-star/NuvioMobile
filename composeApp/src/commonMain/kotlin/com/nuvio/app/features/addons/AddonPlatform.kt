@@ -20,6 +20,7 @@ internal val DefaultAddonManifestUrls: List<String> = listOf(
     "https://opensubtitles-v3.strem.io/manifest.json",
     "https://torrentio.strem.fun/manifest.json",
     "https://comet.elfhosted.com/manifest.json",
+    "https://2ecbbd610840-stremio-ar.baby-beamup.club/manifest.json",
 )
 
 data class RawHttpResponse(
