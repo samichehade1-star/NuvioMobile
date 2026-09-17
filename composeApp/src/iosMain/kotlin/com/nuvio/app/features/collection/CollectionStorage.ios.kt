@@ -12,4 +12,11 @@ actual object CollectionStorage {
     actual fun savePayload(payload: String) {
         NSUserDefaults.standardUserDefaults.setObject(payload, forKey = ProfileScopedKey.of(payloadKey))
     }
+
+    actual fun hasSeededDefaultNetworks(): Boolean =
+        NSUserDefaults.standardUserDefaults.boolForKey(ProfileScopedKey.of("default_networks_seeded"))
+
+    actual fun markDefaultNetworksSeeded() {
+        NSUserDefaults.standardUserDefaults.setBool(true, forKey = ProfileScopedKey.of("default_networks_seeded"))
+    }
 }

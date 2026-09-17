@@ -51,7 +51,10 @@ object CollectionRepository {
         if (hasLoaded) return
         hasLoaded = true
         val payload = CollectionStorage.loadPayload()
-        if (payload.isNullOrBlank()) return
+        if (payload.isNullOrBlank()) {
+            seedDefaultNetworksIfNeeded()
+            return
+        }
 
         runCatching {
             val parsed = json.parseToJsonElement(payload)
@@ -203,6 +206,10 @@ object CollectionRepository {
     }
 
     internal fun applyFromRemote(collections: List<Collection>, rawJson: JsonElement) {
+        if (collections.isEmpty() && !CollectionStorage.hasSeededDefaultNetworks()) {
+            seedDefaultNetworksIfNeeded()
+            return
+        }
         rawCollectionsJson = rawJson
         val normalized = normalizeCollections(collections, source = "remote sync")
         _collections.value = CollectionMobileSettingsRepository.applyToCollections(normalized)
@@ -228,6 +235,19 @@ object CollectionRepository {
 
     private fun ensureLoaded() {
         if (!hasLoaded) initialize()
+    }
+
+    /**
+     * Seeds the default "browse by streaming service" collections (Netflix, Disney+, etc.) the
+     * first time a profile ever loads Collections with nothing configured. Guarded by a
+     * persisted flag so it never reappears after the user removes or edits these collections.
+     */
+    private fun seedDefaultNetworksIfNeeded() {
+        if (CollectionStorage.hasSeededDefaultNetworks()) return
+        CollectionStorage.markDefaultNetworksSeeded()
+        log.d { "seedDefaultNetworksIfNeeded() — seeding default network collections" }
+        _collections.value = buildDefaultNetworkCollections()
+        persist(sync = false)
     }
 
     private fun persist(sync: Boolean = true) {

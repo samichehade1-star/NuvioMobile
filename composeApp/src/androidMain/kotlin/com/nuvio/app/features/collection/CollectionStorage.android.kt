@@ -23,4 +23,14 @@ actual object CollectionStorage {
             ?.putString(ProfileScopedKey.of(payloadKey), payload)
             ?.apply()
     }
+
+    actual fun hasSeededDefaultNetworks(): Boolean =
+        preferences?.getBoolean(ProfileScopedKey.of("default_networks_seeded"), false) ?: false
+
+    actual fun markDefaultNetworksSeeded() {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of("default_networks_seeded"), true)
+            ?.apply()
+    }
 }
