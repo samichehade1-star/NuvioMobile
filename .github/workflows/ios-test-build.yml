@@ -13,7 +13,7 @@ on:
         default: Release
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ios-test-build-${{ github.ref }}
@@ -113,3 +113,79 @@ jobs:
           path: build/ios-ipa/*.ipa
           if-no-files-found: error
           retention-days: 7
+
+      - name: Publish AltStore source
+        if: inputs.configuration == 'Release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          ipa_path="$(find build/ios-ipa -maxdepth 1 -type f -name '*-full-release.ipa' -print -quit)"
+          version="$(sed -nE 's/^[[:space:]]*MARKETING_VERSION[[:space:]]*=[[:space:]]*([^[:space:]#]+).*$/\1/p' iosApp/Configuration/Version.xcconfig | head -n 1)"
+          build_number="$(sed -nE 's/^[[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*([^[:space:]#]+).*$/\1/p' iosApp/Configuration/Version.xcconfig | head -n 1)"
+          size="$(stat -f%z "${ipa_path}")"
+          date_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          short_sha="${GITHUB_SHA:0:7}"
+          tag="ios-v${version}-b${build_number}-${GITHUB_RUN_NUMBER}"
+          asset_name="$(basename "${ipa_path}")"
+
+          gh release create "${tag}" "${ipa_path}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "Nuvio iOS test build ${version} (${build_number})" \
+            --notes "Automated unsigned test build from commit ${short_sha}."
+
+          download_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/${asset_name}"
+
+          mkdir -p altstore
+          if [[ -f altstore/source.json ]]; then
+            prev_versions="$(jq -c '.apps[0].versions // []' altstore/source.json)"
+          else
+            prev_versions="[]"
+          fi
+
+          new_entry="$(jq -n \
+            --arg version "${version}" \
+            --arg build "${build_number}" \
+            --arg date "${date_iso}" \
+            --arg url "${download_url}" \
+            --argjson size "${size}" \
+            --arg desc "Automated test build from commit ${short_sha}." \
+            '{version:$version, buildVersion:$build, date:$date, downloadURL:$url, size:$size, localizedDescription:$desc, minOSVersion:"16.0"}')"
+
+          merged_versions="$(jq -n --argjson new "${new_entry}" --argjson prev "${prev_versions}" \
+            '([$new] + $prev) | unique_by(.buildVersion) | .[0:15]')"
+
+          icon_url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/app-icon-1024.png"
+
+          jq -n \
+            --argjson versions "${merged_versions}" \
+            --arg iconUrl "${icon_url}" \
+            '{
+              name: "Nuvio (Personal Test Builds)",
+              subtitle: "Unofficial personal test builds of Nuvio",
+              description: "Personal AltStore source for sideloading test builds of Nuvio.",
+              tintColor: "#F54F32",
+              apps: [
+                {
+                  name: "Nuvio",
+                  bundleIdentifier: "com.nuvio.media",
+                  developerName: "Nuvio Media",
+                  localizedDescription: "Unofficial personal test build of Nuvio for iOS.",
+                  iconURL: $iconUrl,
+                  versions: $versions,
+                  appPermissions: { entitlements: [], privacy: {} }
+                }
+              ],
+              news: []
+            }' > altstore/source.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add altstore/source.json
+          if git diff --cached --quiet; then
+            echo "No AltStore source changes to commit."
+          else
+            git commit -m "Update AltStore source for ${version} (${build_number})"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
