@@ -859,8 +859,16 @@ final class MPVPlayerViewController: UIViewController {
         clearPlaybackError()
         deactivateAudioSession()
         guard let ctx = mpv else { return }
-        mpv = nil  // nil first so event loop stops reading
-        mpv_terminate_destroy(ctx)
+        mpv = nil  // nil first so any not-yet-started event drain bails out immediately
+        // Serialize on eventQueue so this can never run concurrently with an
+        // in-flight readEvents() drain that already captured the old `mpv`
+        // pointer — without this, mpv_terminate_destroy() can free the
+        // context while the background queue is still calling into it
+        // (use-after-free), which showed up as random crashes when leaving
+        // the player quickly (e.g. switching sources/streams).
+        eventQueue.sync {
+            mpv_terminate_destroy(ctx)
+        }
     }
 
     private func activateAudioSessionForPlayback() {
