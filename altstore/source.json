@@ -1,0 +1,31 @@
+{
+  "name": "Nuvio (Personal Test Builds)",
+  "subtitle": "Unofficial personal test builds of Nuvio",
+  "description": "Personal AltStore source for sideloading test builds of Nuvio.",
+  "tintColor": "#F54F32",
+  "apps": [
+    {
+      "name": "Nuvio",
+      "bundleIdentifier": "com.nuvio.media",
+      "developerName": "Nuvio Media",
+      "localizedDescription": "Unofficial personal test build of Nuvio for iOS.",
+      "iconURL": "https://raw.githubusercontent.com/samichehade1-star/NuvioMobile/cmp-rewrite/iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/app-icon-1024.png",
+      "versions": [
+        {
+          "version": "0.4.22",
+          "buildVersion": "127",
+          "date": "2026-09-17T19:02:50Z",
+          "downloadURL": "https://github.com/samichehade1-star/NuvioMobile/releases/download/ios-v0.4.22-b127-5/nuvio-0.4.22-full-release.ipa",
+          "size": 51362799,
+          "localizedDescription": "Automated test build from commit 07caddd.",
+          "minOSVersion": "16.0"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {}
+      }
+    }
+  ],
+  "news": []
+}
