@@ -146,7 +146,7 @@ jobs:
 
           new_entry="$(jq -n \
             --arg version "${version}" \
-            --arg build "${build_number}" \
+            --arg build "${GITHUB_RUN_NUMBER}" \
             --arg date "${date_iso}" \
             --arg url "${download_url}" \
             --argjson size "${size}" \
@@ -187,5 +187,16 @@ jobs:
             echo "No AltStore source changes to commit."
           else
             git commit -m "Update AltStore source for ${version} (${build_number})"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            for attempt in 1 2 3 4 5; do
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                break
+              fi
+              if [[ "${attempt}" -eq 5 ]]; then
+                echo "::error::Failed to push altstore/source.json after 5 attempts" >&2
+                exit 1
+              fi
+              echo "Push rejected (attempt ${attempt}), rebasing onto latest ${GITHUB_REF_NAME} and retrying..."
+              git fetch origin "${GITHUB_REF_NAME}"
+              git rebase "origin/${GITHUB_REF_NAME}"
+            done
           fi
