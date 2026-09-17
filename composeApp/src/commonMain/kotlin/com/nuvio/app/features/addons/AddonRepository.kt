@@ -67,7 +67,13 @@ object AddonRepository {
         currentProfileId = effectiveProfileId
         log.d { "initialize() — loading local addons for profile $currentProfileId" }
 
-        val storedUrls = dedupeManifestUrls(AddonStorage.loadInstalledAddonUrls(currentProfileId))
+        var storedUrls = dedupeManifestUrls(AddonStorage.loadInstalledAddonUrls(currentProfileId))
+        if (storedUrls.isEmpty() && !AddonStorage.hasSeededDefaultAddons(currentProfileId)) {
+            log.d { "initialize() — seeding default addons for profile $currentProfileId" }
+            storedUrls = DefaultAddonManifestUrls
+            AddonStorage.saveInstalledAddonUrls(currentProfileId, storedUrls)
+        }
+        AddonStorage.markDefaultAddonsSeeded(currentProfileId)
         val enabledByUrl = loadLocalEnabledStates()
         log.d { "initialize() — local addon count: ${storedUrls.size}" }
         if (storedUrls.isEmpty()) return
@@ -129,9 +135,16 @@ object AddonRepository {
                 }
             }
 
-            val urls = rowsByUrl.keys.toList()
+            var urls = rowsByUrl.keys.toList()
             log.i { "pullFromServer() — server returned ${rows.size} addons" }
             urls.forEachIndexed { i, u -> log.d { "  server[$i]: $u" } }
+
+            val seedDefaults = urls.isEmpty() && !AddonStorage.hasSeededDefaultAddons(currentProfileId)
+            if (seedDefaults) {
+                log.d { "pullFromServer() — seeding default addons for profile $currentProfileId" }
+                urls = DefaultAddonManifestUrls
+            }
+            AddonStorage.markDefaultAddonsSeeded(currentProfileId)
 
             val existingByUrl = _uiState.value.addons.associateBy(ManagedAddon::manifestUrl)
             _uiState.value = AddonsUiState(
@@ -145,6 +158,7 @@ object AddonRepository {
                 },
             )
             persist()
+            if (seedDefaults) pushToServer()
             urls.forEach { url ->
                 val existing = existingByUrl[url]
                 val addon = _uiState.value.addons.firstOrNull { it.manifestUrl == url }

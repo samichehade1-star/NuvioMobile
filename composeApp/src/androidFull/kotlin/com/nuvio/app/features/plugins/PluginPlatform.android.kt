@@ -48,6 +48,16 @@ internal object PluginStorage {
             ?.putString("settings_${scraperId}", payload)
             ?.apply()
     }
+
+    fun hasSeededDefaultRepositories(profileId: Int): Boolean =
+        preferences?.getBoolean("default_repositories_seeded_$profileId", false) ?: false
+
+    fun markDefaultRepositoriesSeeded(profileId: Int) {
+        preferences
+            ?.edit()
+            ?.putBoolean("default_repositories_seeded_$profileId", true)
+            ?.apply()
+    }
 }
 
 internal fun currentPluginPlatform(): String = "android"

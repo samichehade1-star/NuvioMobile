@@ -5,7 +5,22 @@ internal expect object AddonStorage {
     fun saveInstalledAddonUrls(profileId: Int, urls: List<String>)
     fun loadAddonEnabledStates(profileId: Int): Map<String, Boolean>
     fun saveAddonEnabledStates(profileId: Int, states: Map<String, Boolean>)
+    fun hasSeededDefaultAddons(profileId: Int): Boolean
+    fun markDefaultAddonsSeeded(profileId: Int)
 }
+
+/**
+ * Manifest URLs installed automatically the first time a profile ever loads addons, so a
+ * fresh install has working catalogs/metadata, subtitles, and streams out of the box.
+ * Only public, unauthenticated addon instances belong here — never a URL carrying a
+ * personal debrid/API token.
+ */
+internal val DefaultAddonManifestUrls: List<String> = listOf(
+    "https://v3-cinemeta.strem.io/manifest.json",
+    "https://opensubtitles-v3.strem.io/manifest.json",
+    "https://torrentio.strem.fun/manifest.json",
+    "https://comet.elfhosted.com/manifest.json",
+)
 
 data class RawHttpResponse(
     val status: Int,

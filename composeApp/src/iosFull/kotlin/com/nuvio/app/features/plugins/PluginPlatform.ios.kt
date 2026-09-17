@@ -93,6 +93,13 @@ internal object PluginStorage {
         )
     }
 
+    fun hasSeededDefaultRepositories(profileId: Int): Boolean =
+        NSUserDefaults.standardUserDefaults.boolForKey("default_repositories_seeded_$profileId")
+
+    fun markDefaultRepositoriesSeeded(profileId: Int) {
+        NSUserDefaults.standardUserDefaults.setBool(true, forKey = "default_repositories_seeded_$profileId")
+    }
+
     private fun scraperCodeDirectory(profileId: Int): String =
         "${NSHomeDirectory()}/Library/Application Support/$scraperCodeDirectoryName/$profileId"
 

@@ -39,6 +39,18 @@ import nuvio.composeapp.generated.resources.plugins_repository_install_failed
 import nuvio.composeapp.generated.resources.plugins_repository_refresh_failed
 import org.jetbrains.compose.resources.getString
 
+/**
+ * Plugin repository manifests installed automatically the first time a profile ever loads
+ * plugins, so a fresh install has a working free-source fallback out of the box. This runs
+ * third-party JavaScript scraper code (unlike the read-only Stremio addons) — only add a
+ * repository here that's been explicitly vetted for this purpose.
+ */
+private val DefaultPluginRepositoryUrls: List<String> = listOf(
+    "https://raw.githubusercontent.com/D3adlyRocket/All-in-One-Nuvio/refs/heads/main/manifest.json",
+    "https://raw.githubusercontent.com/michat88/nuvio-providers/refs/heads/main/manifest.json",
+    "https://raw.githubusercontent.com/yoruix/nuvio-providers/refs/heads/main/manifest.json",
+)
+
 @Serializable
 private data class PluginRow(
     val url: String,
@@ -89,12 +101,37 @@ actual object PluginRepository {
         ensureStateLoadedForProfile(effectiveProfileId)
         if (!shouldRefreshStoredRepos) return
 
+        seedDefaultRepositoriesIfNeeded(effectiveProfileId)
+
         val state = _uiState.value
         val nowEpochMs = currentEpochMillis()
         state.repositories.filter { repo ->
             shouldRefreshRepository(repo, state.scrapers, nowEpochMs)
         }.forEach { repo ->
             refreshRepositoryInternal(repo.manifestUrl, pushAfterRefresh = false, ensureInitialized = false)
+        }
+    }
+
+    private fun seedDefaultRepositoriesIfNeeded(profileId: Int) {
+        if (_uiState.value.repositories.isNotEmpty()) return
+        if (PluginStorage.hasSeededDefaultRepositories(profileId)) return
+        log.d { "seedDefaultRepositoriesIfNeeded() — seeding default plugin repositories for profile $profileId" }
+        PluginStorage.markDefaultRepositoriesSeeded(profileId)
+        _uiState.update { state ->
+            state.copy(
+                repositories = DefaultPluginRepositoryUrls.map { url ->
+                    PluginRepositoryItem(
+                        manifestUrl = url,
+                        name = url.substringBefore("?").substringAfterLast('/'),
+                        isRefreshing = true,
+                    )
+                },
+            )
+        }
+        persist()
+        pushToServer()
+        DefaultPluginRepositoryUrls.forEach { url ->
+            refreshRepositoryInternal(url, pushAfterRefresh = false, ensureInitialized = false)
         }
     }
 
@@ -128,7 +165,14 @@ actual object PluginRepository {
                 }
                 .decodeList<PluginRow>()
 
-            val urls = dedupeManifestUrls(rows.map { it.url })
+            var urls = dedupeManifestUrls(rows.map { it.url })
+            val seedDefaults = urls.isEmpty() && !PluginStorage.hasSeededDefaultRepositories(currentProfileId)
+            if (seedDefaults) {
+                log.d { "pullFromServer() — seeding default plugin repositories for profile $currentProfileId" }
+                urls = DefaultPluginRepositoryUrls
+            }
+            PluginStorage.markDefaultRepositoriesSeeded(currentProfileId)
+
             val existingState = _uiState.value
             val existingReposByUrl = existingState.repositories.associateBy { it.manifestUrl }
             val nowEpochMs = currentEpochMillis()
@@ -163,6 +207,7 @@ actual object PluginRepository {
                 scrapers = nextScrapers,
             )
             persist()
+            if (seedDefaults) pushToServer()
 
             nextRepos.filter(PluginRepositoryItem::isRefreshing).forEach { repository ->
                 refreshRepository(repository.manifestUrl, pushAfterRefresh = false)
