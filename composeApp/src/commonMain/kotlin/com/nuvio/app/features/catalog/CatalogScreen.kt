@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +64,11 @@ import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.stableKey
+import com.nuvio.app.features.search.SearchFilterState
+import com.nuvio.app.features.search.SearchResultsFilterBar
+import com.nuvio.app.features.search.SearchSortOption
+import com.nuvio.app.features.search.applySearchFilters
+import com.nuvio.app.features.search.applySearchSort
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watching.application.WatchingState
 import com.nuvio.app.navigation.LocalUseNativeNavigation
@@ -105,6 +111,27 @@ fun CatalogScreen(
     )
     var headerHeightPx by remember { mutableIntStateOf(0) }
     var observedOfflineState by remember { mutableStateOf(false) }
+    var catalogSortOptionName by rememberSaveable(target) { mutableStateOf(SearchSortOption.Relevance.name) }
+    val catalogSortOption = remember(catalogSortOptionName) { SearchSortOption.valueOf(catalogSortOptionName) }
+    var catalogFilterType by rememberSaveable(target) { mutableStateOf<String?>(null) }
+    var catalogFilterGenre by rememberSaveable(target) { mutableStateOf<String?>(null) }
+    var catalogFilterMinRating by rememberSaveable(target) { mutableStateOf<Double?>(null) }
+    var catalogFilterMinYear by rememberSaveable(target) { mutableStateOf<Int?>(null) }
+    var catalogFilterMaxYear by rememberSaveable(target) { mutableStateOf<Int?>(null) }
+    val catalogFilterState = remember(
+        catalogFilterType, catalogFilterGenre, catalogFilterMinRating, catalogFilterMinYear, catalogFilterMaxYear,
+    ) {
+        SearchFilterState(
+            type = catalogFilterType,
+            genre = catalogFilterGenre,
+            minRating = catalogFilterMinRating,
+            minYear = catalogFilterMinYear,
+            maxYear = catalogFilterMaxYear,
+        )
+    }
+    val displayedItems = remember(uiState.items, catalogSortOption, catalogFilterState) {
+        applySearchSort(applySearchFilters(uiState.items, catalogFilterState), catalogSortOption)
+    }
 
     LaunchedEffect(target, homeCatalogSettingsUiState.hideUnreleasedContent) {
         CatalogRepository.load(
@@ -203,9 +230,17 @@ fun CatalogScreen(
                             },
                         )
                     }
+                } else if (displayedItems.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        CatalogEmptyState(
+                            errorMessage = null,
+                            networkCondition = networkStatusUiState.condition,
+                            onRetry = null,
+                        )
+                    }
                 } else {
                     items(
-                        items = uiState.items.withDuplicateSafeLazyKeys { item -> item.stableKey() },
+                        items = displayedItems.withDuplicateSafeLazyKeys { item -> item.stableKey() },
                         key = { item -> item.lazyKey },
                     ) { keyedItem ->
                         val item = keyedItem.value
@@ -235,6 +270,18 @@ fun CatalogScreen(
                 subtitle = subtitle,
                 modifier = Modifier.onSizeChanged { headerHeightPx = it.height },
                 onBack = onBack,
+                showFilters = uiState.items.isNotEmpty(),
+                allItems = uiState.items,
+                sortOption = catalogSortOption,
+                filterState = catalogFilterState,
+                onSortSelected = { catalogSortOptionName = it.name },
+                onTypeSelected = { catalogFilterType = it },
+                onGenreSelected = { catalogFilterGenre = it },
+                onRatingSelected = { catalogFilterMinRating = it },
+                onYearSelected = { min, max ->
+                    catalogFilterMinYear = min
+                    catalogFilterMaxYear = max
+                },
             )
         }
     }
@@ -246,6 +293,15 @@ private fun CatalogHeader(
     subtitle: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    showFilters: Boolean = false,
+    allItems: List<MetaPreview> = emptyList(),
+    sortOption: SearchSortOption = SearchSortOption.Relevance,
+    filterState: SearchFilterState = SearchFilterState(),
+    onSortSelected: (SearchSortOption) -> Unit = {},
+    onTypeSelected: (String?) -> Unit = {},
+    onGenreSelected: (String?) -> Unit = {},
+    onRatingSelected: (Double?) -> Unit = {},
+    onYearSelected: (Int?, Int?) -> Unit = { _, _ -> },
 ) {
     if (LocalUseNativeNavigation.current) {
         Box(
@@ -289,6 +345,19 @@ private fun CatalogHeader(
                     fontWeight = FontWeight.Medium,
                 ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (showFilters) {
+            Spacer(modifier = Modifier.height(12.dp))
+            SearchResultsFilterBar(
+                allItems = allItems,
+                sortOption = sortOption,
+                filterState = filterState,
+                onSortSelected = onSortSelected,
+                onTypeSelected = onTypeSelected,
+                onGenreSelected = onGenreSelected,
+                onRatingSelected = onRatingSelected,
+                onYearSelected = onYearSelected,
             )
         }
     }

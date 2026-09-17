@@ -30,6 +30,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
@@ -197,6 +198,28 @@ object SearchRepository {
                 },
                 errorMessage = if (allFailed) firstFailure else null,
             )
+
+            if (sections.isNotEmpty()) {
+                enrichSectionsForFiltering(requestKey, sections)
+            }
+        }
+    }
+
+    /**
+     * Backfills missing genre/rating fields via TMDB so the search screen's sort/filter chips
+     * work across all results, not just the ones the addon happened to enrich. Runs after the
+     * initial results are shown and patches state in place; guarded by requestKey so a stale
+     * enrichment pass from a superseded search can't clobber newer results.
+     */
+    private fun enrichSectionsForFiltering(requestKey: String, sections: List<HomeCatalogSection>) {
+        scope.launch {
+            val enrichedSections = sections.map { section ->
+                section.copy(items = SearchTmdbEnrichment.enrichMissingFields(section.items))
+            }
+            if (lastRequestKey != requestKey) return@launch
+            _uiState.update { current ->
+                if (current.sections !== sections) current else current.copy(sections = enrichedSections)
+            }
         }
     }
 

@@ -48,7 +48,6 @@ import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
-import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.core.ui.ScreenActivityEffect
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.firstEnabledManifestError
@@ -56,10 +55,10 @@ import com.nuvio.app.features.addons.hasPendingEnabledManifests
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.buildAddonCatalogRefreshSignature
-import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.components.homeSectionHorizontalPaddingForWidth
 import com.nuvio.app.features.home.components.HomeSkeletonRow
+import com.nuvio.app.features.home.components.PosterGridRow
 import com.nuvio.app.features.home.components.posterGridColumnCountForWidth
 import com.nuvio.app.features.watched.WatchedRepository
 import kotlinx.coroutines.delay
@@ -72,6 +71,7 @@ import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_retry
 import nuvio.composeapp.generated.resources.compose_nav_search
 import nuvio.composeapp.generated.resources.compose_search_clear
+import nuvio.composeapp.generated.resources.compose_search_clear_all_recent_searches
 import nuvio.composeapp.generated.resources.compose_search_discover_title
 import nuvio.composeapp.generated.resources.compose_search_empty_failed_message
 import nuvio.composeapp.generated.resources.compose_search_empty_failed_title
@@ -131,6 +131,28 @@ fun SearchScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var lastRequestedQuery by rememberSaveable { mutableStateOf<String?>(null) }
     var observedOfflineState by remember { mutableStateOf(false) }
+    var searchSortOptionName by rememberSaveable { mutableStateOf(SearchSortOption.Relevance.name) }
+    val searchSortOption = remember(searchSortOptionName) { SearchSortOption.valueOf(searchSortOptionName) }
+    var searchFilterType by rememberSaveable { mutableStateOf<String?>(null) }
+    var searchFilterGenre by rememberSaveable { mutableStateOf<String?>(null) }
+    var searchFilterMinRating by rememberSaveable { mutableStateOf<Double?>(null) }
+    var searchFilterMinYear by rememberSaveable { mutableStateOf<Int?>(null) }
+    var searchFilterMaxYear by rememberSaveable { mutableStateOf<Int?>(null) }
+    val searchFilterState = remember(
+        searchFilterType, searchFilterGenre, searchFilterMinRating, searchFilterMinYear, searchFilterMaxYear,
+    ) {
+        SearchFilterState(
+            type = searchFilterType,
+            genre = searchFilterGenre,
+            minRating = searchFilterMinRating,
+            minYear = searchFilterMinYear,
+            maxYear = searchFilterMaxYear,
+        )
+    }
+    val mergedSearchItems = remember(uiState.sections) { mergeSearchSections(uiState.sections) }
+    val displayedSearchItems = remember(mergedSearchItems, searchSortOption, searchFilterState) {
+        applySearchSort(applySearchFilters(mergedSearchItems, searchFilterState), searchSortOption)
+    }
     val discoverInFocus by remember(query, listState) {
         derivedStateOf {
             query.isBlank() && listState.firstVisibleItemIndex > 0
@@ -293,12 +315,13 @@ fun SearchScreen(
         }
 
         if (query.isBlank()) {
-            if (isSearchFocused && recentSearches.isNotEmpty()) {
+            if (recentSearches.isNotEmpty()) {
                 item(key = "recent_searches") {
                     SearchRecentSection(
                         recentSearches = recentSearches,
                         onSearchPress = { recentQuery -> query = recentQuery },
                         onRemoveSearch = SearchHistoryRepository::removeSearch,
+                        onClearAll = SearchHistoryRepository::clearAll,
                     )
                 }
             }
@@ -372,19 +395,48 @@ fun SearchScreen(
                     }
 
                     else -> {
-                        items(
-                            items = uiState.sections.withDuplicateSafeLazyKeys { section -> section.key },
-                            key = { section -> section.lazyKey },
-                        ) { keyedSection ->
-                            val section = keyedSection.value
-                            HomeCatalogRowSection(
-                                section = section,
-                                modifier = Modifier.padding(bottom = 12.dp),
-                                watchedKeys = watchedUiState.watchedKeys,
-                                fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
-                                onPosterClick = onPosterClick,
-                                onPosterLongClick = onPosterLongClick,
+                        item(key = "search_filter_bar") {
+                            SearchResultsFilterBar(
+                                allItems = mergedSearchItems,
+                                sortOption = searchSortOption,
+                                filterState = searchFilterState,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                onSortSelected = { searchSortOptionName = it.name },
+                                onTypeSelected = { searchFilterType = it },
+                                onGenreSelected = { searchFilterGenre = it },
+                                onRatingSelected = { searchFilterMinRating = it },
+                                onYearSelected = { min, max ->
+                                    searchFilterMinYear = min
+                                    searchFilterMaxYear = max
+                                },
                             )
+                        }
+
+                        if (displayedSearchItems.isEmpty()) {
+                            item {
+                                SearchEmptyStateCard(
+                                    reason = SearchEmptyStateReason.NoResults,
+                                    errorMessage = null,
+                                    networkCondition = networkStatusUiState.condition,
+                                    modifier = Modifier.padding(horizontal = homeSectionPadding),
+                                )
+                            }
+                        } else {
+                            items(count = (displayedSearchItems.size + discoverColumns - 1) / discoverColumns) { rowIndex ->
+                                val firstIndex = rowIndex * discoverColumns
+                                PosterGridRow(
+                                    items = displayedSearchItems.subList(
+                                        firstIndex,
+                                        minOf(firstIndex + discoverColumns, displayedSearchItems.size),
+                                    ),
+                                    columns = discoverColumns,
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    watchedKeys = watchedUiState.watchedKeys,
+                                    fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                                    onPosterClick = onPosterClick,
+                                    onPosterLongClick = onPosterLongClick,
+                                )
+                            }
                         }
                         if (uiState.isLoading) {
                             item(key = "search_loading_more") {
@@ -463,6 +515,7 @@ private fun SearchRecentSection(
     recentSearches: List<String>,
     onSearchPress: (String) -> Unit,
     onRemoveSearch: (String) -> Unit,
+    onClearAll: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -471,11 +524,23 @@ private fun SearchRecentSection(
             .padding(horizontal = 16.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(
-            text = stringResource(Res.string.compose_search_recent_searches),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onBackground,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(Res.string.compose_search_recent_searches),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = stringResource(Res.string.compose_search_clear_all_recent_searches),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable(onClick = onClearAll),
+            )
+        }
         Spacer(modifier = Modifier.height(4.dp))
         recentSearches.forEach { recentQuery ->
             SearchRecentRow(

@@ -624,6 +624,10 @@ internal data class CollectionCatalogDefinition(
 internal fun visibleCollectionsWithUniqueIds(collections: List<Collection>): List<Collection> =
     collections
         .filter { collection -> collection.folders.isNotEmpty() }
+        // Network collections (Netflix, Disney+, etc.) render as real title rows via
+        // HomeRepository.fetchNetworkHomeSections() instead of the single-folder-card tile
+        // this list feeds — excluded here so they don't show up twice on Home.
+        .filterNot { collection -> collection.id.startsWith("network_") }
         .distinctBy(Collection::id)
 
 internal fun buildCollectionDefinitions(collections: List<Collection>): List<CollectionCatalogDefinition> =

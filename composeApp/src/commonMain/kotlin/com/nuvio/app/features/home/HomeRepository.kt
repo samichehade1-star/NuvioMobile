@@ -37,6 +37,8 @@ object HomeRepository {
     private var currentRequestKey: String? = null
     private var currentDefinitions: List<HomeCatalogDefinition> = emptyList()
     private var cachedSections: Map<String, HomeCatalogSection> = emptyMap()
+    private var cachedNetworkSections: List<HomeCatalogSection> = emptyList()
+    private var networkRowsJob: Job? = null
     private var cachedCollectionHeroItems: List<MetaPreview> = emptyList()
     private var collectionHeroJob: Job? = null
     private var collectionHeroRequestKey: String? = null
@@ -44,6 +46,7 @@ object HomeRepository {
     private var lastErrorMessage: String? = null
 
     fun refresh(addons: List<ManagedAddon>, force: Boolean = false) {
+        refreshNetworkRows(force)
         val activeAddons = addons.enabledAddons()
         val requests = buildHomeCatalogDefinitions(activeAddons)
         currentDefinitions = requests
@@ -158,6 +161,9 @@ object HomeRepository {
         currentRequestKey = null
         currentDefinitions = emptyList()
         cachedSections = emptyMap()
+        cachedNetworkSections = emptyList()
+        networkRowsJob?.cancel()
+        networkRowsJob = null
         cachedCollectionHeroItems = emptyList()
         collectionHeroJob?.cancel()
         collectionHeroJob = null
@@ -165,6 +171,24 @@ object HomeRepository {
         lastPublishedCatalogHeroEmpty = true
         lastErrorMessage = null
         _uiState.value = HomeUiState()
+    }
+
+    /**
+     * Fetches real title rows for the default network collections (Netflix, Disney+, etc.),
+     * independent of the addon-catalog batch above since they're TMDB-backed, not addon-backed.
+     * Only re-fetches when nothing is cached yet or a forced refresh was requested.
+     */
+    private fun refreshNetworkRows(force: Boolean) {
+        if (!force && cachedNetworkSections.isNotEmpty()) return
+        networkRowsJob?.cancel()
+        networkRowsJob = scope.launch {
+            val sections = runCatching { fetchNetworkHomeSections() }.getOrElse { emptyList() }
+            cachedNetworkSections = sections
+            publishCurrentState(
+                isLoading = _uiState.value.isLoading,
+                requestKey = currentRequestKey,
+            )
+        }
     }
 
     private fun publishCurrentState(
@@ -189,7 +213,7 @@ object HomeRepository {
                 section.copy(
                     title = customTitle.ifBlank { definition.titleFor(snapshot.showCatalogType) },
                 )
-            }
+            } + cachedNetworkSections.map { it.withReleaseFilter() }.filter { it.items.isNotEmpty() }
 
         val catalogHeroItems = if (snapshot.heroEnabled) {
             val heroRandom = Random((requestKey?.hashCode() ?: 0).absoluteValue + 1)

@@ -8,6 +8,7 @@ import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.tmdb.buildTmdbUrl
 import com.nuvio.app.features.tmdb.normalizeTmdbLanguage
+import com.nuvio.app.features.tmdb.tmdbGenreNames
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -416,6 +417,7 @@ object TmdbCollectionSourceResolver {
             popularity = popularity,
             voteCount = voteCount,
             imdbRating = voteAverage?.let { ((it * 10).roundToInt() / 10.0).toString() },
+            genres = tmdbGenreNames(genreIds, isTv = mediaType == TmdbCollectionMediaType.TV),
         )
     }
 
@@ -704,6 +706,7 @@ private data class TmdbListItem(
     @SerialName("vote_average") val voteAverage: Double? = null,
     @SerialName("vote_count") val voteCount: Int? = null,
     val popularity: Double? = null,
+    @SerialName("genre_ids") val genreIds: List<Int> = emptyList(),
 )
 
 @Serializable
