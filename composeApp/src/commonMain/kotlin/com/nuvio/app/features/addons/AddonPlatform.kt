@@ -20,6 +20,14 @@ internal val DefaultAddonManifestUrls: List<String> = listOf(
     "https://opensubtitles-v3.strem.io/manifest.json",
     "https://torrentio.strem.fun/manifest.json",
     "https://comet.elfhosted.com/manifest.json",
+)
+
+/**
+ * Manifest URLs that were seeded by default in an earlier build but turned out to be broken
+ * (missing artwork, dead streams) and should be actively removed even from installs that
+ * already seeded them, not just excluded from future seeding.
+ */
+internal val RetiredDefaultAddonManifestUrls: List<String> = listOf(
     "https://2ecbbd610840-stremio-ar.baby-beamup.club/manifest.json",
 )
 

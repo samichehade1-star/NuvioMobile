@@ -68,9 +68,19 @@ object AddonRepository {
         log.d { "initialize() — loading local addons for profile $currentProfileId" }
 
         var storedUrls = dedupeManifestUrls(AddonStorage.loadInstalledAddonUrls(currentProfileId))
+        var needsPersist = false
+        val prunedUrls = storedUrls.filterNot { it in RetiredDefaultAddonManifestUrls }
+        if (prunedUrls.size != storedUrls.size) {
+            log.d { "initialize() — pruning retired default addons for profile $currentProfileId" }
+            storedUrls = prunedUrls
+            needsPersist = true
+        }
         if (storedUrls.isEmpty() && !AddonStorage.hasSeededDefaultAddons(currentProfileId)) {
             log.d { "initialize() — seeding default addons for profile $currentProfileId" }
             storedUrls = DefaultAddonManifestUrls
+            needsPersist = true
+        }
+        if (needsPersist) {
             AddonStorage.saveInstalledAddonUrls(currentProfileId, storedUrls)
         }
         AddonStorage.markDefaultAddonsSeeded(currentProfileId)
@@ -139,6 +149,13 @@ object AddonRepository {
             log.i { "pullFromServer() — server returned ${rows.size} addons" }
             urls.forEachIndexed { i, u -> log.d { "  server[$i]: $u" } }
 
+            val prunedUrls = urls.filterNot { it in RetiredDefaultAddonManifestUrls }
+            val hadRetiredAddons = prunedUrls.size != urls.size
+            if (hadRetiredAddons) {
+                log.d { "pullFromServer() — pruning retired default addons for profile $currentProfileId" }
+                urls = prunedUrls
+            }
+
             val seedDefaults = urls.isEmpty() && !AddonStorage.hasSeededDefaultAddons(currentProfileId)
             if (seedDefaults) {
                 log.d { "pullFromServer() — seeding default addons for profile $currentProfileId" }
@@ -158,7 +175,7 @@ object AddonRepository {
                 },
             )
             persist()
-            if (seedDefaults) pushToServer()
+            if (seedDefaults || hadRetiredAddons) pushToServer()
             urls.forEach { url ->
                 val existing = existingByUrl[url]
                 val addon = _uiState.value.addons.firstOrNull { it.manifestUrl == url }
