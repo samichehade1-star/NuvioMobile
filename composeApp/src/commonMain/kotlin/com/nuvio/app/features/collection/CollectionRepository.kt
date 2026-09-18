@@ -216,8 +216,19 @@ object CollectionRepository {
         persist(sync = false)
     }
 
-    private fun pruneRetiredNetworkCollections(collections: List<Collection>): List<Collection> =
-        collections.filterNot { it.id in RetiredDefaultNetworkCollectionIds }
+    private fun pruneRetiredNetworkCollections(collections: List<Collection>): List<Collection> {
+        if (collections.none { it.id in RetiredDefaultNetworkReplacements }) return collections
+        val defaultsById = buildDefaultNetworkCollections().associateBy { it.id }
+        val currentIds = collections.mapTo(mutableSetOf()) { it.id }
+        return collections.mapNotNull { collection ->
+            val replacementId = RetiredDefaultNetworkReplacements[collection.id]
+            when {
+                replacementId == null -> collection
+                replacementId in currentIds -> null
+                else -> defaultsById[replacementId]
+            }
+        }
+    }
 
     internal fun onMobileSettingsChanged() {
         if (!hasLoaded) return

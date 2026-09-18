@@ -21,12 +21,12 @@ internal fun buildDefaultNetworkCollections(): List<Collection> =
     )
 
 /**
- * Collection ids that used to be seeded by default but were dropped (e.g. for weak TMDB
- * watch-provider data quality) and should be actively removed from installs that already
- * seeded them, not just excluded from future seeding.
+ * Retired default network collection ids mapped to the id that replaces them, so installs
+ * that already seeded the retired one get swapped over to the replacement instead of just
+ * losing it. Only the key ids need to be excluded from [buildDefaultNetworkCollections].
  */
-internal val RetiredDefaultNetworkCollectionIds: Set<String> = setOf(
-    "network_paramount_plus",
+internal val RetiredDefaultNetworkReplacements: Map<String, String> = mapOf(
+    "network_paramount_plus" to "network_apple_tv_plus",
 )
 
 private fun networkCollection(
