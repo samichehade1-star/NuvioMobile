@@ -62,8 +62,8 @@ object CollectionRepository {
             val decoded = json.decodeFromJsonElement<List<Collection>>(parsed)
             val normalized = pruneRetiredNetworkCollections(normalizeCollections(decoded, source = "local storage"))
             _collections.value = CollectionMobileSettingsRepository.applyToCollections(normalized)
-            if (normalized.size != decoded.size) {
-                persist(sync = false)
+            if (normalized != decoded) {
+                persist(sync = true)
             }
         }.onFailure { e ->
             log.e(e) { "Failed to load collections from storage" }
