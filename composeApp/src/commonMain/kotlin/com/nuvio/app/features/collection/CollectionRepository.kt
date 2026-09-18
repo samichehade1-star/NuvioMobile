@@ -60,7 +60,7 @@ object CollectionRepository {
             val parsed = json.parseToJsonElement(payload)
             rawCollectionsJson = parsed
             val decoded = json.decodeFromJsonElement<List<Collection>>(parsed)
-            val normalized = normalizeCollections(decoded, source = "local storage")
+            val normalized = pruneRetiredNetworkCollections(normalizeCollections(decoded, source = "local storage"))
             _collections.value = CollectionMobileSettingsRepository.applyToCollections(normalized)
             if (normalized.size != decoded.size) {
                 persist(sync = false)
@@ -211,10 +211,13 @@ object CollectionRepository {
             return
         }
         rawCollectionsJson = rawJson
-        val normalized = normalizeCollections(collections, source = "remote sync")
+        val normalized = pruneRetiredNetworkCollections(normalizeCollections(collections, source = "remote sync"))
         _collections.value = CollectionMobileSettingsRepository.applyToCollections(normalized)
         persist(sync = false)
     }
+
+    private fun pruneRetiredNetworkCollections(collections: List<Collection>): List<Collection> =
+        collections.filterNot { it.id in RetiredDefaultNetworkCollectionIds }
 
     internal fun onMobileSettingsChanged() {
         if (!hasLoaded) return

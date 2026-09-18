@@ -17,8 +17,17 @@ internal fun buildDefaultNetworkCollections(): List<Collection> =
         networkCollection(id = "network_hbo_max", title = "HBO Max", watchProviders = "384|1899"),
         networkCollection(id = "network_hulu", title = "Hulu", watchProviders = "15"),
         networkCollection(id = "network_peacock", title = "Peacock", watchProviders = "386|387"),
-        networkCollection(id = "network_paramount_plus", title = "Paramount+", watchProviders = "531"),
+        networkCollection(id = "network_apple_tv_plus", title = "Apple TV+", watchProviders = "350"),
     )
+
+/**
+ * Collection ids that used to be seeded by default but were dropped (e.g. for weak TMDB
+ * watch-provider data quality) and should be actively removed from installs that already
+ * seeded them, not just excluded from future seeding.
+ */
+internal val RetiredDefaultNetworkCollectionIds: Set<String> = setOf(
+    "network_paramount_plus",
+)
 
 private fun networkCollection(
     id: String,
