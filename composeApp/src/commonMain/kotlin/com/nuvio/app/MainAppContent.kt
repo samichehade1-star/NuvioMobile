@@ -168,6 +168,8 @@ import com.nuvio.app.features.watching.application.WatchingState
 import com.nuvio.app.features.watching.domain.isShortPlaceholderDuration
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
+import com.nuvio.app.features.watchprogress.ResumeOrStartOverDialog
+import com.nuvio.app.features.watchprogress.ResumeOrStartOverMinPositionMs
 import com.nuvio.app.features.watchprogress.ResumePromptRepository
 import com.nuvio.app.features.watchprogress.WatchProgressPlaybackSession
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
@@ -664,6 +666,7 @@ internal fun MainAppContent(
         }
     }
     var resumePromptItem by remember { mutableStateOf<ContinueWatchingItem?>(null) }
+    var pendingResumeChoiceItem by remember { mutableStateOf<ContinueWatchingItem?>(null) }
     var lastExternalPlayerLaunch by remember { mutableStateOf<PlayerLaunch?>(null) }
     val activePlaybackProfileId = profileState.activeProfile?.profileIndex ?: ProfileRepository.activeProfileId
     val launchExternalPlayer = rememberExternalPlayerLauncher { result ->
@@ -1237,7 +1240,11 @@ internal fun MainAppContent(
         }
 
         val onContinueWatchingClick: (ContinueWatchingItem) -> Unit = { item ->
-            openContinueWatching(item, false, false)
+            if (!item.isNextUp && item.resumePositionMs > ResumeOrStartOverMinPositionMs) {
+                pendingResumeChoiceItem = item
+            } else {
+                openContinueWatching(item, false, false)
+            }
         }
 
         val onContinueWatchingStartFromBeginning: (ContinueWatchingItem) -> Unit = { item ->
@@ -2074,6 +2081,22 @@ internal fun MainAppContent(
                     .align(Alignment.BottomCenter)
                     .zIndex(15f),
             )
+
+            pendingResumeChoiceItem?.let { item ->
+                ResumeOrStartOverDialog(
+                    resumePositionMs = item.resumePositionMs,
+                    resumeProgressFraction = item.resumeProgressFraction,
+                    onResume = {
+                        pendingResumeChoiceItem = null
+                        openContinueWatching(item, false, false)
+                    },
+                    onStartOver = {
+                        pendingResumeChoiceItem = null
+                        openContinueWatching(item, false, true)
+                    },
+                    onDismiss = { pendingResumeChoiceItem = null },
+                )
+            }
 
             NuvioToastHost(
                 modifier = Modifier

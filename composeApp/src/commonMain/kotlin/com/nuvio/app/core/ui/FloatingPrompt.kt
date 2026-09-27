@@ -22,9 +22,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -53,6 +55,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.floating_prompt_continue_where_left_off
+import nuvio.composeapp.generated.resources.floating_prompt_dismiss
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
@@ -240,6 +243,21 @@ fun NuvioFloatingPrompt(
                                     modifier = Modifier.size(tokens.icons.md),
                                 )
                             }
+                        }
+
+                        IconButton(
+                            onClick = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onDismiss()
+                            },
+                            modifier = Modifier.size(NuvioTokens.Space.s40),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = stringResource(Res.string.floating_prompt_dismiss),
+                                tint = tokens.colors.textMuted,
+                                modifier = Modifier.size(tokens.icons.sm),
+                            )
                         }
                     }
 

@@ -595,6 +595,10 @@ object StreamsRepository {
         _uiState.update { it.copy(selectedFilter = addonId) }
     }
 
+    fun selectQualityFilter(quality: String?) {
+        _uiState.update { it.copy(selectedQualityFilter = quality) }
+    }
+
     fun consumeAutoPlay() {
         activeRequestKey = null
         _uiState.update {

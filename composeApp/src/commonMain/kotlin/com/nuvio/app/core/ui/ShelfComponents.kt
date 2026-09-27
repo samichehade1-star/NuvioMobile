@@ -26,6 +26,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -138,6 +142,7 @@ fun NuvioPosterCard(
         shape = shape,
     )
     val shouldShowTitleBelow = showTitleBelow && !posterCardStyle.hideLabelsEnabled
+    var imageLoadFailed by remember(imageUrl) { mutableStateOf(false) }
 
     Column(
         modifier = modifier.width(cardWidth),
@@ -161,12 +166,13 @@ fun NuvioPosterCard(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            if (imageUrl != null) {
+            if (imageUrl != null && !imageLoadFailed) {
                 AsyncImage(
                     model = imageUrl,
                     contentDescription = title,
                     modifier = Modifier.matchParentSize(),
                     contentScale = ContentScale.Crop,
+                    onError = { imageLoadFailed = true },
                 )
             } else {
                 Text(

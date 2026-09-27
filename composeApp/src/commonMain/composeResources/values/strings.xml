@@ -639,6 +639,7 @@
     <string name="episodes_season">Season %1$d</string>
     <string name="episodes_specials">Specials</string>
     <string name="floating_prompt_continue_where_left_off">Continue where you left off</string>
+    <string name="floating_prompt_dismiss">Dismiss</string>
     <string name="hero_add_to_library">Add to library</string>
     <string name="hero_mark_unwatched">Mark as unwatched</string>
     <string name="hero_mark_watched">Mark as watched</string>
@@ -1649,10 +1650,16 @@
     <string name="streams_no_direct_link">No direct stream link available</string>
     <string name="streams_no_metadata">No metadata available</string>
     <string name="streams_refresh">Refresh streams</string>
+    <string name="streams_recommended">Recommended</string>
     <string name="streams_resume_from_percent">Resume from %1$d%</string>
     <string name="streams_resume_from_time">Resume from %1$s</string>
     <string name="streams_size">SIZE %1$s</string>
     <string name="streams_torrent_not_supported">This stream type is not supported</string>
+    <string name="resume_or_start_over_title">Continue watching?</string>
+    <string name="resume_or_start_over_body_percent">You left off around %1$d%%. Resume from where you stopped, or start over from the beginning?</string>
+    <string name="resume_or_start_over_body_time">You left off at %1$s. Resume from where you stopped, or start over from the beginning?</string>
+    <string name="resume_or_start_over_resume">Resume</string>
+    <string name="resume_or_start_over_start_over">Start Over</string>
     <string name="debrid_missing_api_key">Connect an account in Settings.</string>
     <string name="debrid_not_cached">Not cached on Torbox.</string>
     <string name="debrid_stream_stale">This link expired. Refreshing results.</string>

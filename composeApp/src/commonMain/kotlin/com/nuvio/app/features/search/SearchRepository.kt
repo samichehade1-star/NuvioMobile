@@ -473,7 +473,7 @@ object SearchRepository {
             search = query,
             forceRefresh = forceRefresh,
         ).withUnreleasedFilter()
-        val items = page.items
+        val items = page.items.sortedByDescending { it.searchRelevanceScore(query) }
         require(items.isNotEmpty()) {
             getString(Res.string.search_error_no_results_for_catalog, catalogName)
         }
@@ -674,3 +674,25 @@ private fun String.typeSortKey(): String =
         "anime" -> "2_anime"
         else -> "9_$this"
     }
+
+/**
+ * Ranks a catalog's search results by how well they actually match the query, instead of
+ * trusting whatever order the addon's own search endpoint returned them in (which varies a lot
+ * addon to addon, and often isn't relevance-sorted at all). Exact/prefix/word-boundary title
+ * matches are scored well above a result the addon merely decided to include, with a small
+ * popularity nudge as a tiebreaker among similarly-good matches.
+ */
+private fun MetaPreview.searchRelevanceScore(query: String): Double {
+    val title = name.trim().lowercase()
+    val q = query.trim().lowercase()
+    if (q.isBlank() || title.isBlank()) return 0.0
+    val matchScore = when {
+        title == q -> 100.0
+        title.startsWith(q) -> 80.0
+        Regex("\\b" + Regex.escape(q)).containsMatchIn(title) -> 60.0
+        title.contains(q) -> 40.0
+        else -> 10.0
+    }
+    val popularityBoost = ((popularity ?: 0.0).coerceIn(0.0, 500.0) / 500.0) * 10.0
+    return matchScore + popularityBoost
+}

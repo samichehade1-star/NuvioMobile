@@ -503,6 +503,12 @@ private fun MobileStreamsLayout(
                         onFilterSelected = { addonId -> StreamsRepository.selectFilter(addonId) },
                         onRefresh = onRefresh,
                     )
+                    QualityFilterRow(
+                        availableQualities = uiState.availableQualityFilters,
+                        selectedQuality = uiState.selectedQualityFilter,
+                        onQualitySelected = { quality -> StreamsRepository.selectQualityFilter(quality) },
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
 
                     StreamList(
                         uiState = uiState,
@@ -768,6 +774,37 @@ internal fun ProviderFilterRow(
 }
 
 @Composable
+internal fun QualityFilterRow(
+    availableQualities: List<String>,
+    selectedQuality: String?,
+    onQualitySelected: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (availableQualities.isEmpty()) return
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip(
+            label = stringResource(Res.string.collections_tab_all),
+            isSelected = selectedQuality == null,
+            onClick = { onQualitySelected(null) },
+        )
+        availableQualities.forEach { quality ->
+            FilterChip(
+                label = quality,
+                isSelected = selectedQuality == quality,
+                onClick = { onQualitySelected(quality) },
+            )
+        }
+    }
+}
+
+@Composable
 private fun FilterChip(
     label: String? = null,
     icon: ImageVector? = null,
@@ -868,6 +905,7 @@ internal fun StreamList(
     val fetchingText = stringResource(Res.string.streams_fetching)
     val findingStreamsText = stringResource(Res.string.streams_finding_streams)
     val checkingMoreAddonsText = stringResource(Res.string.streams_checking_more_addons)
+    val recommendedLabel = stringResource(Res.string.streams_recommended)
     val formatStreamSize = rememberStreamSizeLabelFormat()
     val streamBadgeSettings by remember {
         StreamBadgeSettingsRepository.ensureLoaded()
@@ -913,6 +951,8 @@ internal fun StreamList(
                         onStreamLongPress = onStreamLongPress,
                         resumePositionMs = resumePositionMs,
                         resumeProgressFraction = resumeProgressFraction,
+                        recommendedStream = uiState.recommendedStream,
+                        recommendedLabel = recommendedLabel,
                     )
                 }
                 if (anyLoading) {
@@ -944,6 +984,8 @@ private fun LazyListScope.streamSection(
     onStreamLongPress: (StreamItem) -> Unit,
     resumePositionMs: Long?,
     resumeProgressFraction: Float?,
+    recommendedStream: StreamItem?,
+    recommendedLabel: String,
 ) {
     if (group.streams.isEmpty() && !group.isLoading) return
 
@@ -994,6 +1036,8 @@ private fun LazyListScope.streamSection(
                 showFileSizeBadges = showFileSizeBadges,
                 showAddonLogo = showAddonLogo,
                 badgePlacement = badgePlacement,
+                isRecommended = recommendedStream != null && stream == recommendedStream,
+                recommendedLabel = recommendedLabel,
                 onClick = {
                     if (isSelectable) {
                         onStreamSelected(stream, resumePositionMs, resumeProgressFraction)

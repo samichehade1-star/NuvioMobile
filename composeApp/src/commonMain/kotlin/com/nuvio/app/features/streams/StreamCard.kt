@@ -55,6 +55,8 @@ internal fun StreamCard(
     modifier: Modifier = Modifier,
     isCurrent: Boolean = false,
     currentLabel: String? = null,
+    isRecommended: Boolean = false,
+    recommendedLabel: String? = null,
 ) {
     val cardShape = RoundedCornerShape(12.dp)
     val badgeImages = stream.badges.filter { it.imageURL.isNotBlank() }
@@ -113,6 +115,9 @@ internal fun StreamCard(
                 if (isCurrent && !currentLabel.isNullOrBlank()) {
                     Spacer(modifier = Modifier.width(8.dp))
                     CurrentStreamBadge(label = currentLabel)
+                } else if (isRecommended && !recommendedLabel.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    CurrentStreamBadge(label = recommendedLabel)
                 }
             }
 

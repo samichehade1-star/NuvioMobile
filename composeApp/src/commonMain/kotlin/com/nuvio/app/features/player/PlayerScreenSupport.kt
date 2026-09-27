@@ -4,7 +4,7 @@ import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.streams.StreamItem
 
-internal const val PlaybackProgressPersistIntervalMs = 60_000L
+internal const val PlaybackProgressPersistIntervalMs = 15_000L
 internal const val PlayerDoubleTapSeekStepMs = 10_000L
 internal const val PlayerDoubleTapSeekResetDelayMs = 800L
 internal const val PlayerLockedOverlayDurationMs = 2_000L

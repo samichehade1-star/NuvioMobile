@@ -85,6 +85,57 @@ data class StreamItem(
     val isCachedDebridTorrentStream: Boolean
         get() = isTorrentStream && debridCacheStatus?.state == StreamDebridCacheState.CACHED
 
+    /**
+     * Normalized quality bucket ("4K", "1080p", "720p", "SD") for filtering, or null when it
+     * can't be determined. Prefers the addon's own structured metadata (clientResolve.parsed,
+     * a Stremio SDK convention some addons populate) and falls back to scanning the raw title
+     * text for addons that don't.
+     */
+    val resolutionBucket: String?
+        get() {
+            clientResolve?.stream?.raw?.parsed?.resolution?.let { bucketFromText(it)?.let { bucket -> return bucket } }
+            val candidateText = listOfNotNull(
+                name,
+                title,
+                clientResolve?.filename,
+                clientResolve?.torrentName,
+            ).joinToString(" ")
+            return bucketFromText(candidateText)
+        }
+
+    /**
+     * Heuristic score for surfacing a "Recommended" pick: favors higher resolution, HDR, and a
+     * cached/direct debrid source (fast, reliable playback) over a raw torrent that still needs
+     * peers. There's no way to know ahead of time whether a stream's file has chapter markers -
+     * that's only readable once mpv has actually loaded it - so this can't factor that in.
+     */
+    val recommendationScore: Int
+        get() {
+            var score = when (resolutionBucket) {
+                "4K" -> 40
+                "1080p" -> 30
+                "720p" -> 20
+                "SD" -> 10
+                else -> 0
+            }
+            val parsed = clientResolve?.stream?.raw?.parsed
+            if (!parsed?.hdr.isNullOrEmpty()) score += 5
+            if (isCachedDebridTorrentStream || isDirectDebridStream) score += 25
+            else if (isTorrentStream) score -= 5
+            return score
+        }
+
+    private fun bucketFromText(text: String): String? {
+        val lower = text.lowercase()
+        return when {
+            Regex("""\b(2160p|4k|uhd)\b""").containsMatchIn(lower) -> "4K"
+            Regex("""\b1080p\b""").containsMatchIn(lower) -> "1080p"
+            Regex("""\b720p\b""").containsMatchIn(lower) -> "720p"
+            Regex("""\b(480p|360p|240p|sd)\b""").containsMatchIn(lower) -> "SD"
+            else -> null
+        }
+    }
+
     val needsLocalDebridResolve: Boolean
         get() = isTorrentStream && playableDirectUrl == null
 
@@ -292,6 +343,7 @@ data class StreamsUiState(
     val groups: List<AddonStreamGroup> = emptyList(),
     val activeAddonIds: Set<String> = emptySet(),
     val selectedFilter: String? = null,
+    val selectedQualityFilter: String? = null,
     val isAnyLoading: Boolean = false,
     val emptyStateReason: StreamsEmptyStateReason? = null,
     val autoPlayStream: StreamItem? = null,
@@ -301,12 +353,35 @@ data class StreamsUiState(
     val overlayMessage: String? = null,
 ) {
     val filteredGroups: List<AddonStreamGroup>
-        get() = if (selectedFilter == null) groups
+        get() {
+            val byProvider = if (selectedFilter == null) groups
                 else groups.filter { it.addonId == selectedFilter }
+            val quality = selectedQualityFilter ?: return byProvider
+            return byProvider.map { group ->
+                group.copy(streams = group.streams.filter { it.resolutionBucket == quality })
+            }.filter { it.streams.isNotEmpty() || it.isLoading }
+        }
+
+    /** Quality buckets present across the unfiltered provider selection, for building the filter row. */
+    val availableQualityFilters: List<String>
+        get() {
+            val byProvider = if (selectedFilter == null) groups
+                else groups.filter { it.addonId == selectedFilter }
+            val present = byProvider.flatMap { it.streams }
+                .mapNotNull { it.resolutionBucket }
+                .toSet()
+            return listOf("4K", "1080p", "720p", "SD").filter { it in present }
+        }
 
     val allStreams: List<StreamItem>
         get() = filteredGroups.flatMap { it.streams }
 
     val hasAnyStreams: Boolean
         get() = groups.any { it.streams.isNotEmpty() }
+
+    /** Best pick across every stream found (independent of the active filter), if any stands out. */
+    val recommendedStream: StreamItem?
+        get() = groups.flatMap { it.streams }
+            .maxByOrNull { it.recommendationScore }
+            ?.takeIf { it.recommendationScore >= 30 }
 }
