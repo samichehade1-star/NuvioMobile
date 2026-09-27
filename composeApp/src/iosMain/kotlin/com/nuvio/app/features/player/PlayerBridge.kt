@@ -77,6 +77,9 @@ interface NuvioPlayerBridge {
     )
     fun getIsLoading(): Boolean
     fun getIsPlaying(): Boolean
+    fun isPictureInPictureSupported(): Boolean
+    fun startPictureInPicture()
+    fun stopPictureInPicture()
     fun getIsEnded(): Boolean
     fun getDurationMs(): Long
     fun getPositionMs(): Long

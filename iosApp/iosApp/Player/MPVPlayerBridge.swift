@@ -192,6 +192,9 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func getDurationMs() -> Int64 { return playerVC?.durationMs ?? 0 }
     func getPositionMs() -> Int64 { return playerVC?.positionMs ?? 0 }
     func getBufferedMs() -> Int64 { return playerVC?.bufferedMs ?? 0 }
+    func isPictureInPictureSupported() -> Bool { return playerVC?.isPictureInPictureSupported() ?? false }
+    func startPictureInPicture() { playerVC?.startPictureInPicture() }
+    func stopPictureInPicture() { playerVC?.stopPictureInPicture() }
     func getPlaybackSpeed() -> Float { playerVC?.currentSpeed ?? 1.0 }
     func getErrorMessage() -> String { playerVC?.currentErrorMessage ?? "" }
 
@@ -519,12 +522,18 @@ final class MPVPlayerViewController: UIViewController {
 
     @objc private func enterBackground() {
         guard mpv != nil else { return }
+        if isPlayerPlaying, startPictureInPicture() {
+            // Picture in Picture takes over showing the video; keep decoding it instead of the
+            // usual "pause and drop the video track" background behavior.
+            return
+        }
         pausePlayback()
         setStringProperty("vid", "no")
     }
 
     @objc private func enterForeground() {
         guard mpv != nil else { return }
+        stopPictureInPicture()
         setStringProperty("vid", "auto")
         playPlayback()
     }
@@ -640,6 +649,55 @@ final class MPVPlayerViewController: UIViewController {
         let seconds = Double(ms) / 1000.0
         let seekMode = exact ? "relative+exact" : "relative"
         command("seek", args: [String(format: "%.3f", seconds), seekMode])
+    }
+
+    // MARK: - Picture in Picture
+    //
+    // mpv owns the CAMetalLayer's swapchain directly (embedded via the "wid" option), so there's
+    // no per-frame texture the app can hand to AVSampleBufferDisplayLayer for real-time PiP video
+    // without a deeper rendering-pipeline change. This uses mpv's screenshot-to-file command to
+    // periodically grab a still frame instead - not smooth video, but a live-ish thumbnail that
+    // keeps updating while backgrounded, which is what actually makes it into the PiP window.
+
+    private lazy var pictureInPictureController: MPVPictureInPictureController? = {
+        guard #available(iOS 15.0, *) else { return nil }
+        return MPVPictureInPictureController(owner: self)
+    }()
+
+    func isPictureInPictureSupported() -> Bool {
+        pictureInPictureController?.isSupported ?? false
+    }
+
+    @discardableResult
+    func startPictureInPicture() -> Bool {
+        pictureInPictureController?.start() ?? false
+    }
+
+    func stopPictureInPicture() {
+        pictureInPictureController?.stop()
+    }
+
+    func captureCurrentFrame(to url: URL, completion: @escaping (Bool) -> Void) {
+        guard mpv != nil else { completion(false); return }
+        try? FileManager.default.removeItem(at: url)
+        command("screenshot-to-file", args: [url.path, "video"])
+        // screenshot-to-file is documented as completing synchronously, but the small delay is
+        // cheap insurance against relying on that timing exactly.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            completion(FileManager.default.fileExists(atPath: url.path))
+        }
+    }
+
+    func resumeForPictureInPicture() {
+        DispatchQueue.main.async { [weak self] in self?.playPlayback() }
+    }
+
+    func pauseForPictureInPicture() {
+        DispatchQueue.main.async { [weak self] in self?.pausePlayback() }
+    }
+
+    func seekForPictureInPicture(byMs ms: Int64) {
+        DispatchQueue.main.async { [weak self] in self?.seekByMs(ms, exact: true) }
     }
 
     func retryPlayback() {
