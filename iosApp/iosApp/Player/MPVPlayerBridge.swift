@@ -331,6 +331,7 @@ final class MPVPlayerViewController: UIViewController {
         metalLayer.position = .zero
         view.layer.addSublayer(metalLayer)
         layoutMetalLayer()
+        attachPictureInPictureLayerIfNeeded()
 
         setupMpv()
         activateAudioSessionForPlayback()
@@ -346,6 +347,7 @@ final class MPVPlayerViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         layoutMetalLayer()
+        layoutPictureInPictureLayer()
         attemptStartPendingLoad()
     }
 
@@ -460,6 +462,19 @@ final class MPVPlayerViewController: UIViewController {
             lastAppliedDrawableSize = drawableSize
         }
         CATransaction.commit()
+    }
+
+    private func attachPictureInPictureLayerIfNeeded() {
+        guard let layer = pictureInPictureController?.displayLayer, layer.superlayer == nil else { return }
+        layer.videoGravity = .resizeAspect
+        layer.frame = view.bounds
+        // Kept behind the live mpv metal layer - it only matters for what PiP's snapshot sees,
+        // never for the on-screen player while the app is foregrounded.
+        view.layer.insertSublayer(layer, below: metalLayer)
+    }
+
+    private func layoutPictureInPictureLayer() {
+        pictureInPictureController?.displayLayer.frame = view.bounds
     }
 
     // MARK: - MPV Setup

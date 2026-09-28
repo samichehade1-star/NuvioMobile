@@ -23,6 +23,12 @@ final class MPVPictureInPictureController: NSObject, AVPictureInPictureSampleBuf
     private let screenshotURL: URL
     private var isCapturing = false
 
+    /// Must be inserted into the app's real layer hierarchy (even off-screen or behind other
+    /// layers) before starting PiP - AVPictureInPictureController renders the floating window from
+    /// this layer's live composited content. A detached layer starts a PiP session with nothing to
+    /// show (audio/video keeps playing, but the PiP window stays blank).
+    var displayLayer: AVSampleBufferDisplayLayer { sampleBufferDisplayLayer }
+
     init(owner: MPVPlayerViewController) {
         self.owner = owner
         self.screenshotURL = FileManager.default.temporaryDirectory
