@@ -28,6 +28,15 @@
           "size": 51405310,
           "localizedDescription": "Automated test build from commit 8c56ab2.",
           "minOSVersion": "16.0"
+        },
+        {
+          "version": "0.4.22",
+          "buildVersion": "9",
+          "date": "2026-09-28T08:25:31Z",
+          "downloadURL": "https://github.com/samichehade1-star/NuvioMobile/releases/download/ios-v0.4.22-b127-9/nuvio-0.4.22-full-release.ipa",
+          "size": 51405464,
+          "localizedDescription": "Automated test build from commit ac12b09.",
+          "minOSVersion": "16.0"
         }
       ],
       "appPermissions": {
