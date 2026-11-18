@@ -24,6 +24,7 @@ import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.components.HomeSkeletonRow
 import com.nuvio.app.features.home.components.homeSectionHorizontalPaddingForWidth
+import com.nuvio.app.features.library.LibraryDownloadsButton
 import com.nuvio.app.features.watched.WatchedRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -47,6 +48,7 @@ fun NetworksHubScreen(
     onCatalogClick: ((HomeCatalogSection) -> Unit)? = null,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
+    onDownloadsClick: (() -> Unit)? = null,
 ) {
     var sections by remember { mutableStateOf<List<HomeCatalogSection>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -83,6 +85,11 @@ fun NetworksHubScreen(
                     title = stringResource(Res.string.networks_hub_title),
                     modifier = Modifier.padding(horizontal = 16.dp),
                     topPadding = topChromePadding,
+                    actions = {
+                        if (onDownloadsClick != null) {
+                            LibraryDownloadsButton(onClick = onDownloadsClick)
+                        }
+                    },
                 )
             }
             when {

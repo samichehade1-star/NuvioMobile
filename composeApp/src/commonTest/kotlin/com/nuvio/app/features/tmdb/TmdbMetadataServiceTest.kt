@@ -121,7 +121,7 @@ class TmdbMetadataServiceTest {
     }
 
     @Test
-    fun `applyEnrichment replaces episode release only when enabled`() {
+    fun `applyEnrichment does not replace episode release dates from TMDB`() {
         val addonRelease = "2023-12-31T19:00:00Z"
         val base = MetaDetails(
             id = "tt1234567",
@@ -147,25 +147,18 @@ class TmdbMetadataServiceTest {
             ),
         )
 
-        val disabled = TmdbMetadataService.applyEnrichment(
+        val result = TmdbMetadataService.applyEnrichment(
             meta = base,
             enrichment = null,
             episodeMap = episodes,
             settings = TmdbSettings(enabled = true),
         )
-        val enabled = TmdbMetadataService.applyEnrichment(
-            meta = base,
-            enrichment = null,
-            episodeMap = episodes,
-            settings = TmdbSettings(enabled = true, useReleaseDates = true),
-        )
 
-        assertEquals(addonRelease, disabled.videos.first().released)
-        assertEquals("2024-01-01", enabled.videos.first().released)
+        assertEquals(addonRelease, result.videos.first().released)
     }
 
     @Test
-    fun `applyEnrichment replaces top level release dates only when enabled`() {
+    fun `applyEnrichment does not replace top level release dates from TMDB`() {
         val base = MetaDetails(
             id = "tt1234567",
             type = "series",
@@ -195,23 +188,15 @@ class TmdbMetadataServiceTest {
             networks = emptyList(),
         )
 
-        val disabled = TmdbMetadataService.applyEnrichment(
+        val result = TmdbMetadataService.applyEnrichment(
             meta = base,
             enrichment = enrichment,
             episodeMap = emptyMap(),
             settings = TmdbSettings(enabled = true),
         )
-        val enabled = TmdbMetadataService.applyEnrichment(
-            meta = base,
-            enrichment = enrichment,
-            episodeMap = emptyMap(),
-            settings = TmdbSettings(enabled = true, useReleaseDates = true),
-        )
 
-        assertEquals(base.releaseInfo, disabled.releaseInfo)
-        assertEquals(base.lastAirDate, disabled.lastAirDate)
-        assertEquals("2024-01-01", enabled.releaseInfo)
-        assertEquals("2024-12-31", enabled.lastAirDate)
+        assertEquals(base.releaseInfo, result.releaseInfo)
+        assertEquals(base.lastAirDate, result.lastAirDate)
     }
 
     @Test
@@ -280,6 +265,18 @@ class TmdbMetadataServiceTest {
         assertTrue(containsCjkOrHangul("김수현"))
         assertFalse(containsCjkOrHangul("Atsuko Tanaka"))
         assertFalse(containsCjkOrHangul("Scarlett Johansson"))
+    }
+
+    @Test
+    fun `isTalkShowGuestAppearance skips talk show guests but keeps hosts and other series`() {
+        assertTrue(isTalkShowGuestAppearance(listOf(10767, 35), "Self - Guest"))
+        assertTrue(isTalkShowGuestAppearance(listOf(10767), "Self"))
+        assertTrue(isTalkShowGuestAppearance(listOf(10767), null))
+        assertFalse(isTalkShowGuestAppearance(listOf(10767), "Self - Host"))
+        assertFalse(isTalkShowGuestAppearance(listOf(10767), "Co-Host"))
+        assertFalse(isTalkShowGuestAppearance(listOf(18, 80), "Self"))
+        assertFalse(isTalkShowGuestAppearance(emptyList(), "Detective Ghost"))
+        assertTrue(isTalkShowGuestAppearance(listOf(10767), "Ghost"))
     }
 
     @Test
