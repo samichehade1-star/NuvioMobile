@@ -23,7 +23,8 @@ concurrency:
 jobs:
   update:
     name: Update store.json
-    if: github.event_name != 'release' || !github.event.release.prerelease
+    # Fork: only NuvioMedia publishes the official store.json; this fork's builds use altstore/source.json.
+    if: github.repository_owner == 'NuvioMedia' && (github.event_name != 'release' || !github.event.release.prerelease)
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}

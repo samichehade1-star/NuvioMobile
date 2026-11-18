@@ -124,61 +124,36 @@ jobs:
           ipa_path="$(find build/ios-ipa -maxdepth 1 -type f -name '*-full-release.ipa' -print -quit)"
           version="$(sed -nE 's/^[[:space:]]*MARKETING_VERSION[[:space:]]*=[[:space:]]*([^[:space:]#]+).*$/\1/p' iosApp/Configuration/Version.xcconfig | head -n 1)"
           build_number="$(sed -nE 's/^[[:space:]]*CURRENT_PROJECT_VERSION[[:space:]]*=[[:space:]]*([^[:space:]#]+).*$/\1/p' iosApp/Configuration/Version.xcconfig | head -n 1)"
-          size="$(stat -f%z "${ipa_path}")"
-          date_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           short_sha="${GITHUB_SHA:0:7}"
-          tag="ios-v${version}-b${build_number}-${GITHUB_RUN_NUMBER}"
+
+          # Give every test build a unique, increasing CFBundleVersion (e.g. 158.12) so
+          # SideStore/AltStore offer it as an update. Gradle needs an integer in the xcconfig,
+          # so stamp the built (unsigned) IPA instead; SideStore re-signs it on install.
+          test_build="${build_number}.${GITHUB_RUN_NUMBER}"
+          stamp_dir="$(mktemp -d)"
+          ditto -x -k "${ipa_path}" "${stamp_dir}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${test_build}" "${stamp_dir}"/Payload/*.app/Info.plist
+          rm -f "${ipa_path}"
+          (cd "${stamp_dir}" && zip -qry -X "${OLDPWD}/${ipa_path}" Payload)
+          rm -rf "${stamp_dir}"
+
+          tag="ios-v${version}-b${test_build}"
           asset_name="$(basename "${ipa_path}")"
 
           gh release create "${tag}" "${ipa_path}" \
             --repo "${GITHUB_REPOSITORY}" \
-            --title "Nuvio iOS test build ${version} (${build_number})" \
+            --title "Nuvio iOS test build ${version} (${test_build})" \
             --notes "Automated unsigned test build from commit ${short_sha}."
 
           download_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/${asset_name}"
 
-          mkdir -p altstore
-          if [[ -f altstore/source.json ]]; then
-            prev_versions="$(jq -c '.apps[0].versions // []' altstore/source.json)"
-          else
-            prev_versions="[]"
-          fi
-
-          new_entry="$(jq -n \
-            --arg version "${version}" \
-            --arg build "${GITHUB_RUN_NUMBER}" \
-            --arg date "${date_iso}" \
-            --arg url "${download_url}" \
-            --argjson size "${size}" \
-            --arg desc "Automated test build from commit ${short_sha}." \
-            '{version:$version, buildVersion:$build, date:$date, downloadURL:$url, size:$size, localizedDescription:$desc, minOSVersion:"16.0"}')"
-
-          merged_versions="$(jq -n --argjson new "${new_entry}" --argjson prev "${prev_versions}" \
-            '([$new] + $prev) | unique_by(.buildVersion) | .[0:15]')"
-
-          icon_url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/iosApp/iosApp/Assets.xcassets/AppIcon.appiconset/app-icon-1024.png"
-
-          jq -n \
-            --argjson versions "${merged_versions}" \
-            --arg iconUrl "${icon_url}" \
-            '{
-              name: "Nuvio (Personal Test Builds)",
-              subtitle: "Unofficial personal test builds of Nuvio",
-              description: "Personal AltStore source for sideloading test builds of Nuvio.",
-              tintColor: "#F54F32",
-              apps: [
-                {
-                  name: "Nuvio",
-                  bundleIdentifier: "com.nuvio.media",
-                  developerName: "Nuvio Media",
-                  localizedDescription: "Unofficial personal test build of Nuvio for iOS.",
-                  iconURL: $iconUrl,
-                  versions: $versions,
-                  appPermissions: { entitlements: [], privacy: {} }
-                }
-              ],
-              news: []
-            }' > altstore/source.json
+          python3 scripts/fork-update-altstore-source.py \
+            --source altstore/source.json \
+            --ipa "${ipa_path}" \
+            --download-url "${download_url}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --branch "${GITHUB_REF_NAME}" \
+            --notes "Automated test build from commit ${short_sha}."
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
