@@ -1,5 +1,8 @@
 package com.nuvio.app
 
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.nuvio.app.core.ui.PlatformBackHandler
+import com.nuvio.app.features.library.LibraryScreen
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -159,14 +162,37 @@ internal fun AppTabHost(
             }
 
             AppScreenTab.Library -> {
-                NetworksHubScreen(
-                    modifier = Modifier.fillMaxSize(),
-                    scrollToTopRequests = requests.libraryScrollToTopRequests,
-                    onCatalogClick = actions.onCatalogClick,
-                    onPosterClick = actions.onPosterClick,
-                    onPosterLongClick = actions.onPosterLongClick,
-                    onDownloadsClick = actions.onDownloadsClick,
-                )
+                // Fork: the Library tab opens the Networks hub; upstream's Library screen
+                // (filters, server/cloud libraries, MDBList lists) is one tap away.
+                var showUpstreamLibrary by rememberSaveable { mutableStateOf(false) }
+                PlatformBackHandler(enabled = showUpstreamLibrary) { showUpstreamLibrary = false }
+                if (showUpstreamLibrary) {
+                    LibraryScreen(
+                        modifier = Modifier.fillMaxSize(),
+                        scrollToTopRequests = requests.libraryScrollToTopRequests,
+                        onPosterClick = actions.onLibraryPosterClick,
+                        onPosterLongClick = actions.onLibraryPosterLongClick,
+                        onSectionViewAllClick = actions.onLibrarySectionViewAllClick,
+                        onCloudFilePlay = actions.onCloudFilePlay,
+                        onConnectCloudClick = actions.onConnectCloudClick,
+                        onCatalogClick = actions.onCatalogClick,
+                        onPreviewClick = actions.onPosterClick,
+                        onPreviewLongClick = actions.onPosterLongClick,
+                        onDownloadsClick = actions.onDownloadsClick,
+                        disintegrationRequest = state.libraryDisintegrationRequest,
+                        onNetworksClick = { showUpstreamLibrary = false },
+                    )
+                } else {
+                    NetworksHubScreen(
+                        modifier = Modifier.fillMaxSize(),
+                        scrollToTopRequests = requests.libraryScrollToTopRequests,
+                        onCatalogClick = actions.onCatalogClick,
+                        onPosterClick = actions.onPosterClick,
+                        onPosterLongClick = actions.onPosterLongClick,
+                        onDownloadsClick = actions.onDownloadsClick,
+                        onLibraryClick = { showUpstreamLibrary = true },
+                    )
+                }
             }
 
             AppScreenTab.Settings -> {

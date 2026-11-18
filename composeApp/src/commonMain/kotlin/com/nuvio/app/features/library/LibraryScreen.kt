@@ -1,5 +1,6 @@
 package com.nuvio.app.features.library
 
+import androidx.compose.material.icons.rounded.LiveTv
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -115,6 +116,7 @@ fun LibraryScreen(
     onPreviewLongClick: ((MetaPreview) -> Unit)? = null,
     onDownloadsClick: (() -> Unit)? = null,
     disintegrationRequest: DisintegrationRequest<String>? = null,
+    onNetworksClick: (() -> Unit)? = null,
 ) {
     val uiState by remember {
         LibraryRepository.ensureLoaded()
@@ -349,6 +351,15 @@ fun LibraryScreen(
                             },
                             modifier = Modifier.padding(horizontal = 16.dp),
                             actions = {
+                                if (onNetworksClick != null) {
+                                    IconButton(onClick = onNetworksClick) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.LiveTv,
+                                            contentDescription = stringResource(Res.string.networks_hub_title),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
                                 if (sourceMode == LibraryViewMode.Saved) {
                                     LibraryListManagementButton()
                                     val targetLayout = if (displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL) {
